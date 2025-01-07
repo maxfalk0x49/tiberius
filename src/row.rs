@@ -409,7 +409,9 @@ impl Row {
             Error::Conversion(format!("Could not find column with index {}", idx).into())
         })?;
 
-        let data = self.data.get(idx).unwrap();
+        let data = self.data.get(idx).ok_or_else(|| {
+            Error::Conversion(format!("Could not find column with index {}", idx).into())
+        })?;
 
         R::from_sql(data)
     }
