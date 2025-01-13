@@ -235,7 +235,7 @@ impl PartialEq for Numeric {
 }
 
 #[cfg(feature = "rust_decimal")]
-mod decimal {
+pub mod decimal {
     use super::{Decimal, Numeric};
     use crate::ColumnData;
 
