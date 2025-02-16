@@ -667,8 +667,9 @@ impl<'a> Encode<BytesMutWithTypeInfo<'a>> for ColumnData<'a> {
                 if ty == &VarLenType::Numericn || ty == &VarLenType::Decimaln =>
             {
                 if let Some(num) = opt {
-                    if scale != &num.scale() {
-                        todo!("this still need some work, if client scale not aligned with server, we need to do conversion but will lose precision")
+                    if scale < &num.scale() {
+                        todo!("this still need some work, if client scale not aligned with server, we need to do conversion but will lose precision. {:?}, scale: {:?}, num_scale: {:?}"
+                            , num, scale, &num.scale())
                     }
                     num.encode(&mut *dst)?;
                 } else {
