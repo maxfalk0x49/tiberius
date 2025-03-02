@@ -23,7 +23,7 @@ pub struct MetaDataColumn<'a> {
     pub col_name: Cow<'a, str>,
 }
 
-impl<'a> Display for MetaDataColumn<'a> {
+impl Display for MetaDataColumn<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} ", self.col_name)?;
 
@@ -208,7 +208,7 @@ impl BaseMetaDataColumn {
     }
 }
 
-impl<'a> Encode<BytesMut> for TokenColMetaData<'a> {
+impl Encode<BytesMut> for TokenColMetaData<'_> {
     fn encode(self, dst: &mut BytesMut) -> crate::Result<()> {
         dst.put_u8(TokenType::ColMetaData as u8);
         dst.put_u16_le(self.columns.len() as u16);
@@ -221,7 +221,7 @@ impl<'a> Encode<BytesMut> for TokenColMetaData<'a> {
     }
 }
 
-impl<'a> Encode<BytesMut> for MetaDataColumn<'a> {
+impl Encode<BytesMut> for MetaDataColumn<'_> {
     fn encode(self, dst: &mut BytesMut) -> crate::Result<()> {
         dst.put_u32_le(0);
         self.base.encode(dst)?;
@@ -310,7 +310,7 @@ impl TokenColMetaData<'static> {
     }
 }
 
-impl<'a> TokenColMetaData<'a> {
+impl TokenColMetaData<'_> {
     pub(crate) fn columns(&self) -> impl Iterator<Item = Column> + '_ {
         self.columns.iter().map(|x| Column {
             name: x.col_name.to_string(),

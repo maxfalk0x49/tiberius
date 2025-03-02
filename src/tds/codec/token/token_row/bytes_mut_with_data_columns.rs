@@ -22,7 +22,7 @@ impl<'a> BytesMutWithDataColumns<'a> {
     }
 }
 
-unsafe impl<'a> BufMut for BytesMutWithDataColumns<'a> {
+unsafe impl BufMut for BytesMutWithDataColumns<'_> {
     fn remaining_mut(&self) -> usize {
         self.bytes.remaining_mut()
     }
@@ -36,19 +36,19 @@ unsafe impl<'a> BufMut for BytesMutWithDataColumns<'a> {
     }
 }
 
-impl<'a> Borrow<[u8]> for BytesMutWithDataColumns<'a> {
+impl Borrow<[u8]> for BytesMutWithDataColumns<'_> {
     fn borrow(&self) -> &[u8] {
         self.bytes.deref()
     }
 }
 
-impl<'a> BorrowMut<[u8]> for BytesMutWithDataColumns<'a> {
+impl BorrowMut<[u8]> for BytesMutWithDataColumns<'_> {
     fn borrow_mut(&mut self) -> &mut [u8] {
         self.bytes.borrow_mut()
     }
 }
 
-impl<'a> Deref for BytesMutWithDataColumns<'a> {
+impl Deref for BytesMutWithDataColumns<'_> {
     type Target = BytesMut;
 
     fn deref(&self) -> &Self::Target {
@@ -56,7 +56,7 @@ impl<'a> Deref for BytesMutWithDataColumns<'a> {
     }
 }
 
-impl<'a> DerefMut for BytesMutWithDataColumns<'a> {
+impl DerefMut for BytesMutWithDataColumns<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.bytes
     }

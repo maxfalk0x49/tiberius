@@ -27,7 +27,7 @@ impl<'a> BytesMutWithTypeInfo<'a> {
     }
 }
 
-unsafe impl<'a> BufMut for BytesMutWithTypeInfo<'a> {
+unsafe impl BufMut for BytesMutWithTypeInfo<'_> {
     fn remaining_mut(&self) -> usize {
         self.bytes.remaining_mut()
     }
@@ -41,19 +41,19 @@ unsafe impl<'a> BufMut for BytesMutWithTypeInfo<'a> {
     }
 }
 
-impl<'a> Borrow<[u8]> for BytesMutWithTypeInfo<'a> {
+impl Borrow<[u8]> for BytesMutWithTypeInfo<'_> {
     fn borrow(&self) -> &[u8] {
         self.bytes.deref()
     }
 }
 
-impl<'a> BorrowMut<[u8]> for BytesMutWithTypeInfo<'a> {
+impl BorrowMut<[u8]> for BytesMutWithTypeInfo<'_> {
     fn borrow_mut(&mut self) -> &mut [u8] {
         self.bytes.borrow_mut()
     }
 }
 
-impl<'a> Deref for BytesMutWithTypeInfo<'a> {
+impl Deref for BytesMutWithTypeInfo<'_> {
     type Target = BytesMut;
 
     fn deref(&self) -> &Self::Target {
@@ -61,7 +61,7 @@ impl<'a> Deref for BytesMutWithTypeInfo<'a> {
     }
 }
 
-impl<'a> DerefMut for BytesMutWithTypeInfo<'a> {
+impl DerefMut for BytesMutWithTypeInfo<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.bytes
     }

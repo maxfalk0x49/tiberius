@@ -268,14 +268,14 @@ impl Time {
                 let hi = src.read_u16_le().await? as u64;
                 let lo = src.read_u8().await? as u64;
 
-                hi | lo << 16
+                hi | (lo << 16)
             }
             (3..=4, 4) => src.read_u32_le().await? as u64,
             (5..=7, 5) => {
                 let hi = src.read_u32_le().await? as u64;
                 let lo = src.read_u8().await? as u64;
 
-                hi | lo << 32
+                hi | (lo << 32)
             }
             _ => {
                 return Err(crate::Error::Protocol(

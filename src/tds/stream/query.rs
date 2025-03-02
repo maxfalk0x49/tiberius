@@ -94,7 +94,7 @@ pub struct QueryStream<'a> {
     result_set_index: Option<usize>,
 }
 
-impl<'a> Debug for QueryStream<'a> {
+impl Debug for QueryStream<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("QueryStream")
             .field(
@@ -348,7 +348,7 @@ impl QueryItem {
     }
 }
 
-impl<'a> Stream for QueryStream<'a> {
+impl Stream for QueryStream<'_> {
     type Item = crate::Result<QueryItem>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Option<Self::Item>> {

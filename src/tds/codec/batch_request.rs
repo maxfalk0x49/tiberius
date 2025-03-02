@@ -16,7 +16,7 @@ impl<'a> BatchRequest<'a> {
     }
 }
 
-impl<'a> Encode<BytesMut> for BatchRequest<'a> {
+impl Encode<BytesMut> for BatchRequest<'_> {
     fn encode(self, dst: &mut BytesMut) -> crate::Result<()> {
         dst.put_u32_le(ALL_HEADERS_LEN_TX as u32);
         dst.put_u32_le(ALL_HEADERS_LEN_TX as u32 - 4);

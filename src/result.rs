@@ -47,9 +47,9 @@ pub struct ExecuteResult {
     rows_affected: Vec<u64>,
 }
 
-impl<'a> ExecuteResult {
+impl ExecuteResult {
     pub(crate) async fn new<S: AsyncRead + AsyncWrite + Unpin + Send>(
-        connection: &'a mut Connection<S>,
+        connection: &mut Connection<S>,
     ) -> crate::Result<Self> {
         let mut token_stream = TokenStream::new(connection).try_unfold();
         let mut rows_affected = Vec::new();

@@ -242,7 +242,7 @@ impl<'a> LoginMessage<'a> {
     }
 }
 
-impl<'a> Encode<BytesMut> for LoginMessage<'a> {
+impl Encode<BytesMut> for LoginMessage<'_> {
     fn encode(self, dst: &mut BytesMut) -> crate::Result<()> {
         let mut cursor = Cursor::new(Vec::with_capacity(512));
 

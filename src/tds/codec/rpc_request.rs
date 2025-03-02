@@ -84,13 +84,13 @@ where
     }
 }
 
-impl<'a> From<RpcProcId> for RpcProcIdValue<'a> {
+impl From<RpcProcId> for RpcProcIdValue<'_> {
     fn from(id: RpcProcId) -> Self {
         Self::Id(id)
     }
 }
 
-impl<'a> Encode<BytesMut> for TokenRpcRequest<'a> {
+impl Encode<BytesMut> for TokenRpcRequest<'_> {
     fn encode(self, dst: &mut BytesMut) -> Result<()> {
         dst.put_u32_le(ALL_HEADERS_LEN_TX as u32);
         dst.put_u32_le(ALL_HEADERS_LEN_TX as u32 - 4);
@@ -100,7 +100,7 @@ impl<'a> Encode<BytesMut> for TokenRpcRequest<'a> {
 
         match self.proc_id {
             RpcProcIdValue::Id(ref id) => {
-                let val = (0xffff_u32) | ((*id as u16) as u32) << 16;
+                let val = (0xffff_u32) | (((*id as u16) as u32) << 16);
                 dst.put_u32_le(val);
             }
             RpcProcIdValue::Name(ref _name) => {
@@ -120,7 +120,7 @@ impl<'a> Encode<BytesMut> for TokenRpcRequest<'a> {
     }
 }
 
-impl<'a> Encode<BytesMut> for RpcParam<'a> {
+impl Encode<BytesMut> for RpcParam<'_> {
     fn encode(self, dst: &mut BytesMut) -> Result<()> {
         let len_pos = dst.len();
         let mut length = 0u8;
