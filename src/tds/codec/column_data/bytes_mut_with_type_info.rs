@@ -33,7 +33,7 @@ unsafe impl<'a> BufMut for BytesMutWithTypeInfo<'a> {
     }
 
     unsafe fn advance_mut(&mut self, cnt: usize) {
-        self.bytes.advance_mut(cnt)
+        unsafe { self.bytes.advance_mut(cnt) }
     }
 
     fn chunk_mut(&mut self) -> &mut UninitSlice {

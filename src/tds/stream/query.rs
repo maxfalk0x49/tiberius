@@ -1,5 +1,5 @@
 use crate::tds::stream::ReceivedToken;
-use crate::{row::ColumnType, Column, Row};
+use crate::{Column, Row, row::ColumnType};
 use futures_util::{
     ready,
     stream::{BoxStream, Peekable, Stream, StreamExt, TryStreamExt},
@@ -229,7 +229,7 @@ impl<'a> QueryStream<'a> {
                 (QueryItem::Row(row), None) => {
                     result = Some(vec![row]);
                 }
-                (QueryItem::Row(row), Some(ref mut result)) => result.push(row),
+                (QueryItem::Row(row), Some(result)) => result.push(row),
                 (QueryItem::Metadata(_), None) => {
                     result = Some(Vec::new());
                 }
@@ -319,14 +319,14 @@ impl QueryItem {
     pub fn as_metadata(&self) -> Option<&ResultMetadata> {
         match self {
             QueryItem::Row(_) => None,
-            QueryItem::Metadata(ref metadata) => Some(metadata),
+            QueryItem::Metadata(metadata) => Some(metadata),
         }
     }
 
     /// Returns a reference to the row, if the item is of a correct variant.
     pub fn as_row(&self) -> Option<&Row> {
         match self {
-            QueryItem::Row(ref row) => Some(row),
+            QueryItem::Row(row) => Some(row),
             QueryItem::Metadata(_) => None,
         }
     }

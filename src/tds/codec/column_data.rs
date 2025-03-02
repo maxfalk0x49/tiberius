@@ -26,8 +26,8 @@ use super::{Encode, FixedLenType, TypeInfo, VarLenType};
 #[cfg(feature = "tds73")]
 use crate::tds::time::{Date, DateTime2, DateTimeOffset, Time};
 use crate::{
-    tds::{time::DateTime, time::SmallDateTime, xml::XmlData, Numeric},
     SqlReadBytes,
+    tds::{Numeric, time::DateTime, time::SmallDateTime, xml::XmlData},
 };
 use bytes::BufMut;
 pub(crate) use bytes_mut_with_type_info::BytesMutWithTypeInfo;
@@ -96,15 +96,13 @@ impl<'a> ColumnData<'a> {
             ColumnData::F64(_) => "float(53)".into(),
             ColumnData::Bit(_) => "bit".into(),
             ColumnData::String(None) => "nvarchar(4000)".into(),
-            ColumnData::String(Some(ref s)) if s.len() <= 4000 => "nvarchar(4000)".into(),
-            ColumnData::String(Some(ref s)) if s.len() <= MAX_NVARCHAR_SIZE => {
-                "nvarchar(max)".into()
-            }
+            ColumnData::String(Some(s)) if s.len() <= 4000 => "nvarchar(4000)".into(),
+            ColumnData::String(Some(s)) if s.len() <= MAX_NVARCHAR_SIZE => "nvarchar(max)".into(),
             ColumnData::String(_) => "ntext(max)".into(),
             ColumnData::Guid(_) => "uniqueidentifier".into(),
-            ColumnData::Binary(Some(ref b)) if b.len() <= 8000 => "varbinary(8000)".into(),
+            ColumnData::Binary(Some(b)) if b.len() <= 8000 => "varbinary(8000)".into(),
             ColumnData::Binary(_) => "varbinary(max)".into(),
-            ColumnData::Numeric(Some(ref n)) => {
+            ColumnData::Numeric(Some(n)) => {
                 format!("numeric({},{})", n.precision(), n.scale()).into()
             }
             ColumnData::Numeric(None) => "numeric".into(),
@@ -424,7 +422,7 @@ impl<'a> Encode<BytesMutWithTypeInfo<'a>> for ColumnData<'a> {
                     dst.put_u64_le(0xffffffffffffffff)
                 }
             }
-            (ColumnData::String(Some(ref s)), None) if s.len() <= 4000 => {
+            (ColumnData::String(Some(s)), None) if s.len() <= 4000 => {
                 dst.put_u8(VarLenType::NVarchar as u8);
                 dst.put_u16_le(8000);
                 dst.extend_from_slice(&[0u8; 5][..]);
@@ -446,7 +444,7 @@ impl<'a> Encode<BytesMutWithTypeInfo<'a>> for ColumnData<'a> {
                     dst[len_pos + i] = *byte;
                 }
             }
-            (ColumnData::String(Some(ref s)), None) => {
+            (ColumnData::String(Some(s)), None) => {
                 // length: 0xffff and raw collation
                 dst.put_u8(VarLenType::NVarchar as u8);
                 dst.extend_from_slice(&[0xff_u8; 2]);
@@ -668,8 +666,12 @@ impl<'a> Encode<BytesMutWithTypeInfo<'a>> for ColumnData<'a> {
             {
                 if let Some(num) = opt {
                     if scale < &num.scale() {
-                        todo!("this still need some work, if client scale not aligned with server, we need to do conversion but will lose precision. {:?}, scale: {:?}, num_scale: {:?}"
-                            , num, scale, &num.scale())
+                        todo!(
+                            "this still need some work, if client scale not aligned with server, we need to do conversion but will lose precision. {:?}, scale: {:?}, num_scale: {:?}",
+                            num,
+                            scale,
+                            &num.scale()
+                        )
                     }
                     num.encode(&mut *dst)?;
                 } else {
@@ -691,7 +693,7 @@ impl<'a> Encode<BytesMutWithTypeInfo<'a>> for ColumnData<'a> {
                 // None/null
                 dst.put_u8(FixedLenType::Null as u8);
             }
-            (v, ref ti) => {
+            (v, ti) => {
                 return Err(crate::Error::BulkInput(
                     format!("invalid data type, expecting {:?} but found {:?}", ti, v).into(),
                 ));

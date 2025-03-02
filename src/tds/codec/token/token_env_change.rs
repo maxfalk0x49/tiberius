@@ -1,4 +1,4 @@
-use crate::{tds::Collation, Error, SqlReadBytes};
+use crate::{Error, SqlReadBytes, tds::Collation};
 use byteorder::{LittleEndian, ReadBytesExt};
 use fmt::Debug;
 use futures_util::io::AsyncReadExt;
@@ -84,7 +84,7 @@ pub enum TokenEnvChange {
 impl fmt::Display for TokenEnvChange {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Database(ref old, ref new) => {
+            Self::Database(old, new) => {
                 write!(f, "Database change from '{}' to '{}'", old, new)
             }
             Self::PacketSize(old, new) => {
@@ -104,7 +104,7 @@ impl fmt::Display for TokenEnvChange {
                 "Server requested routing to a new address: {}:{}",
                 host, port
             ),
-            Self::ChangeMirror(ref mirror) => write!(f, "Fallback mirror server: `{}`", mirror),
+            Self::ChangeMirror(mirror) => write!(f, "Fallback mirror server: `{}`", mirror),
             Self::Ignored(ty) => write!(f, "Ignored env change: `{}`", ty),
         }
     }
