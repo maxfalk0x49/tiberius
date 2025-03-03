@@ -1,4 +1,4 @@
-use crate::{tds::Numeric, xml::XmlData, ColumnData};
+use crate::{ColumnData, tds::Numeric, xml::XmlData};
 use uuid::Uuid;
 
 /// A conversion trait from a TDS type by-reference.
@@ -93,6 +93,16 @@ impl FromSqlOwned for String {
     fn from_sql_owned(value: ColumnData<'static>) -> crate::Result<Option<Self>> {
         match value {
             ColumnData::String(s) => Ok(s.map(|s| s.into_owned())),
+            v => Err(crate::Error::Conversion(
+                format!("cannot interpret {:?} as a String value", v).into(),
+            )),
+        }
+    }
+}
+impl<'a> FromSql<'a> for String {
+    fn from_sql(value: &'a ColumnData<'static>) -> crate::Result<Option<Self>> {
+        match value {
+            ColumnData::String(s) => Ok(s.as_deref().map(|s| s.to_string())),
             v => Err(crate::Error::Conversion(
                 format!("cannot interpret {:?} as a String value", v).into(),
             )),
