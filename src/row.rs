@@ -1,7 +1,7 @@
 use crate::{
+    FromSql,
     error::Error,
     tds::codec::{ColumnData, FixedLenType, TokenRow, TypeInfo, VarLenType},
-    FromSql,
 };
 use std::{fmt::Display, sync::Arc};
 
@@ -414,6 +414,23 @@ impl Row {
         })?;
 
         R::from_sql(data)
+    }
+
+    /// Gets the value of the given column that should not be NULL.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the column is NULL or the column
+    /// does not exists
+    pub fn get_required<'a, R, I>(&'a self, idx: I) -> Result<R, Error>
+    where
+        R: FromSql<'a>,
+        I: QueryIdx,
+    {
+        let idx_id = idx.idx(self);
+        self.try_get(idx)?.ok_or_else(|| {
+            Error::Conversion(format!("Required column '{:?}' was null", idx_id).into())
+        })
     }
 }
 
