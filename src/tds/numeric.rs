@@ -1,10 +1,10 @@
 //! Representations of numeric types.
 
 use super::codec::Encode;
-use crate::{sql_read_bytes::SqlReadBytes, Error};
+use crate::{Error, sql_read_bytes::SqlReadBytes};
 #[cfg(feature = "bigdecimal")]
 #[cfg_attr(feature = "docs", doc(cfg(feature = "bigdecimal")))]
-pub use bigdecimal::{num_bigint::BigInt, BigDecimal};
+pub use bigdecimal::{BigDecimal, num_bigint::BigInt};
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::{BufMut, BytesMut};
 #[cfg(feature = "rust_decimal")]
@@ -147,7 +147,7 @@ impl Numeric {
                 x => {
                     return Err(Error::Protocol(
                         format!("decimal/numeric: invalid length of {} received", x).into(),
-                    ))
+                    ));
                 }
             };
 
@@ -240,7 +240,7 @@ pub mod decimal {
     use crate::ColumnData;
 
     #[cfg(feature = "tds73")]
-    from_sql!(Decimal: ColumnData::Numeric(ref num) => num.map(|num| {
+    from_sql!(Decimal: ColumnData::Numeric(num) => num.map(|num| {
         Decimal::from_i128_with_scale(
             num.value(),
             num.scale() as u32,
@@ -290,7 +290,7 @@ pub mod bigdecimal_ {
     use std::convert::TryFrom;
 
     #[cfg(feature = "tds73")]
-    from_sql!(BigDecimal: ColumnData::Numeric(ref num) => num.map(|num| {
+    from_sql!(BigDecimal: ColumnData::Numeric(num) => num.map(|num| {
         let int = BigInt::from(num.value());
 
         BigDecimal::new(int, num.scale() as i64)

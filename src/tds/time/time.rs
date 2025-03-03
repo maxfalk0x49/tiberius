@@ -45,27 +45,27 @@ fn to_sec_fragments(from: Time) -> i64 {
 #[cfg(feature = "tds73")]
 from_sql!(
     PrimitiveDateTime:
-        ColumnData::SmallDateTime(ref dt) => dt.map(|dt| PrimitiveDateTime::new(
+        ColumnData::SmallDateTime(dt) => dt.map(|dt| PrimitiveDateTime::new(
             from_days(dt.days as u64, 1900),
             from_secs(dt.seconds_fragments as u64 * 60),
         )),
-        ColumnData::DateTime2(ref dt) => dt.map(|dt| PrimitiveDateTime::new(
+        ColumnData::DateTime2(dt) => dt.map(|dt| PrimitiveDateTime::new(
             from_days(dt.date.days() as u64, 1),
             Time::from_hms(0,0,0).unwrap() + Duration::from_nanos(dt.time.increments * 10u64.pow(9 - dt.time.scale as u32))
         )),
-        ColumnData::DateTime(ref dt) => dt.map(|dt| PrimitiveDateTime::new(
+        ColumnData::DateTime(dt) => dt.map(|dt| PrimitiveDateTime::new(
             from_days(dt.days as u64, 1900),
             from_sec_fragments(dt.seconds_fragments as u64)
         ));
     Time:
-        ColumnData::Time(ref time) => time.map(|time| {
+        ColumnData::Time(time) => time.map(|time| {
             let ns = time.increments * 10u64.pow(9 - time.scale as u32);
             Time::from_hms(0,0,0).unwrap() + Duration::from_nanos(ns)
         });
     Date:
-        ColumnData::Date(ref date) => date.map(|date| from_days(date.days() as u64, 1));
+        ColumnData::Date(date) => date.map(|date| from_days(date.days() as u64, 1));
     OffsetDateTime:
-        ColumnData::DateTimeOffset(ref dto) => dto.map(|dto| {
+        ColumnData::DateTimeOffset(dto) => dto.map(|dto| {
             let date = from_days(dto.datetime2.date.days() as u64, 1);
             let dt = dto.datetime2;
 
