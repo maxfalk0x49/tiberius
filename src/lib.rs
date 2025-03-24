@@ -256,6 +256,7 @@ pub(crate) extern crate bigdecimal_ as bigdecimal;
 #[macro_use]
 mod macros;
 
+mod bulk_options;
 mod client;
 mod from_sql;
 mod query;
@@ -269,6 +270,7 @@ mod tds;
 
 mod sql_browser;
 
+pub use bulk_options::{ColumOrderHint, SortOrder, SqlBulkCopyOptions};
 pub use client::{AuthMethod, Client, Config};
 pub(crate) use error::Error;
 pub use from_sql::{FromSql, FromSqlOwned};
@@ -277,10 +279,11 @@ pub use result::*;
 pub use row::{Column, ColumnType, Row};
 pub use sql_browser::SqlBrowser;
 pub use tds::{
+    EncryptionLevel,
     codec::{BulkLoadRequest, ColumnData, ColumnFlag, IntoRow, TokenRow, TypeLength},
     numeric,
     stream::QueryStream,
-    time, xml, EncryptionLevel,
+    time, xml,
 };
 pub use to_sql::{IntoSql, ToSql};
 pub use uuid::Uuid;

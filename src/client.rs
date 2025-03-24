@@ -16,13 +16,14 @@ pub(crate) use connection::*;
 
 use crate::tds::stream::ReceivedToken;
 use crate::{
+    BulkLoadRequest, ColumnFlag, SqlReadBytes, ToSql,
     result::ExecuteResult,
     tds::{
         codec::{self, IteratorJoin},
         stream::{QueryStream, TokenStream},
     },
-    BulkLoadRequest, ColumnFlag, SqlReadBytes, ToSql,
 };
+use crate::{ColumOrderHint, SortOrder, SqlBulkCopyOptions};
 use codec::{BatchRequest, ColumnData, PacketHeader, RpcParam, RpcProcId, TokenRpcRequest};
 use enumflags2::BitFlags;
 use futures_util::io::{AsyncRead, AsyncWrite};
@@ -300,11 +301,30 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Client<S> {
         &'a mut self,
         table: &'a str,
     ) -> crate::Result<BulkLoadRequest<'a, S>> {
+        return self
+            .bulk_insert_with_options(table, &[], Default::default(), &[])
+            .await;
+    }
+
+    /// Execute a `BULK INSERT` statement with options, giving more controll over how the bulk
+    /// insert should happen
+    pub async fn bulk_insert_with_options<'a>(
+        &'a mut self,
+        table: &'a str,
+        column_names: &'a [&'a str],
+        options: SqlBulkCopyOptions,
+        order_hints: &'a [ColumOrderHint<'a>],
+    ) -> crate::Result<BulkLoadRequest<'a, S>> {
         // Start the bulk request
         self.connection.flush_stream().await?;
 
         // retrieve column metadata from server
-        let query = format!("SELECT TOP 0 * FROM {}", table);
+        let cols_sql = match column_names.len() {
+            0 => "*".to_owned(),
+            _ => column_names.iter().map(|c| format!("[{}]", c)).join(", "),
+        };
+
+        let query = format!("SELECT TOP 0 {} FROM {}", cols_sql, table);
 
         let req = BatchRequest::new(query, self.connection.context().transaction_descriptor());
 
@@ -334,7 +354,14 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Client<S> {
 
         self.connection.flush_stream().await?;
         let col_data = columns.iter().map(|c| format!("{}", c)).join(", ");
-        let query = format!("INSERT BULK {} ({})", table, col_data);
+
+        let mut query = format!("INSERT BULK {} ({})", table, col_data);
+        if !options.is_empty() || !order_hints.is_empty() {
+            query.push_str("WITH (");
+            options.to_bulk_str(&mut query);
+            SortOrder::to_bulk_str(order_hints, &mut query);
+            query.push_str(")");
+        }
 
         let req = BatchRequest::new(query, self.connection.context().transaction_descriptor());
         let id = self.connection.context_mut().next_packet_id();

@@ -4,13 +4,13 @@ use std::{
 };
 
 use crate::{
+    Column, ColumnData, ColumnType, SqlReadBytes,
     error::Error,
     tds::codec::{Encode, FixedLenType, TokenType, TypeInfo, VarLenType},
-    Column, ColumnData, ColumnType, SqlReadBytes,
 };
 use asynchronous_codec::BytesMut;
 use bytes::BufMut;
-use enumflags2::{bitflags, BitFlags};
+use enumflags2::{BitFlags, bitflags};
 
 #[derive(Debug, Clone)]
 pub struct TokenColMetaData<'a> {
@@ -25,7 +25,7 @@ pub struct MetaDataColumn<'a> {
 
 impl Display for MetaDataColumn<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ", self.col_name)?;
+        write!(f, "[{}] ", self.col_name)?;
 
         match &self.base.ty {
             TypeInfo::FixedLen(fixed) => match fixed {
