@@ -205,3 +205,186 @@ where
         row
     }
 }
+
+// Implementation for 11-tuple
+impl<'a, A, B, C, D, E, F, G, H, I, J, K> IntoRow<'a> for (A, B, C, D, E, F, G, H, I, J, K)
+where
+    A: IntoSql<'a>,
+    B: IntoSql<'a>,
+    C: IntoSql<'a>,
+    D: IntoSql<'a>,
+    E: IntoSql<'a>,
+    F: IntoSql<'a>,
+    G: IntoSql<'a>,
+    H: IntoSql<'a>,
+    I: IntoSql<'a>,
+    J: IntoSql<'a>,
+    K: IntoSql<'a>,
+{
+    fn into_row(self) -> TokenRow<'a> {
+        let mut row = TokenRow::with_capacity(11);
+        row.push(self.0.into_sql());
+        row.push(self.1.into_sql());
+        row.push(self.2.into_sql());
+        row.push(self.3.into_sql());
+        row.push(self.4.into_sql());
+        row.push(self.5.into_sql());
+        row.push(self.6.into_sql());
+        row.push(self.7.into_sql());
+        row.push(self.8.into_sql());
+        row.push(self.9.into_sql());
+        row.push(self.10.into_sql());
+        row
+    }
+}
+
+// Implementation for 12-tuple
+impl<'a, A, B, C, D, E, F, G, H, I, J, K, L> IntoRow<'a> for (A, B, C, D, E, F, G, H, I, J, K, L)
+where
+    A: IntoSql<'a>,
+    B: IntoSql<'a>,
+    C: IntoSql<'a>,
+    D: IntoSql<'a>,
+    E: IntoSql<'a>,
+    F: IntoSql<'a>,
+    G: IntoSql<'a>,
+    H: IntoSql<'a>,
+    I: IntoSql<'a>,
+    J: IntoSql<'a>,
+    K: IntoSql<'a>,
+    L: IntoSql<'a>,
+{
+    fn into_row(self) -> TokenRow<'a> {
+        let mut row = TokenRow::with_capacity(12);
+        row.push(self.0.into_sql());
+        row.push(self.1.into_sql());
+        row.push(self.2.into_sql());
+        row.push(self.3.into_sql());
+        row.push(self.4.into_sql());
+        row.push(self.5.into_sql());
+        row.push(self.6.into_sql());
+        row.push(self.7.into_sql());
+        row.push(self.8.into_sql());
+        row.push(self.9.into_sql());
+        row.push(self.10.into_sql());
+        row.push(self.11.into_sql());
+        row
+    }
+}
+
+// Implementation for 13-tuple
+impl<'a, A, B, C, D, E, F, G, H, I, J, K, L, M> IntoRow<'a>
+    for (A, B, C, D, E, F, G, H, I, J, K, L, M)
+where
+    A: IntoSql<'a>,
+    B: IntoSql<'a>,
+    C: IntoSql<'a>,
+    D: IntoSql<'a>,
+    E: IntoSql<'a>,
+    F: IntoSql<'a>,
+    G: IntoSql<'a>,
+    H: IntoSql<'a>,
+    I: IntoSql<'a>,
+    J: IntoSql<'a>,
+    K: IntoSql<'a>,
+    L: IntoSql<'a>,
+    M: IntoSql<'a>,
+{
+    fn into_row(self) -> TokenRow<'a> {
+        let mut row = TokenRow::with_capacity(13);
+        row.push(self.0.into_sql());
+        row.push(self.1.into_sql());
+        row.push(self.2.into_sql());
+        row.push(self.3.into_sql());
+        row.push(self.4.into_sql());
+        row.push(self.5.into_sql());
+        row.push(self.6.into_sql());
+        row.push(self.7.into_sql());
+        row.push(self.8.into_sql());
+        row.push(self.9.into_sql());
+        row.push(self.10.into_sql());
+        row.push(self.11.into_sql());
+        row.push(self.12.into_sql());
+        row
+    }
+}
+
+// Implementation for 14-tuple
+impl<'a, A, B, C, D, E, F, G, H, I, J, K, L, M, N> IntoRow<'a>
+    for (A, B, C, D, E, F, G, H, I, J, K, L, M, N)
+where
+    A: IntoSql<'a>,
+    B: IntoSql<'a>,
+    C: IntoSql<'a>,
+    D: IntoSql<'a>,
+    E: IntoSql<'a>,
+    F: IntoSql<'a>,
+    G: IntoSql<'a>,
+    H: IntoSql<'a>,
+    I: IntoSql<'a>,
+    J: IntoSql<'a>,
+    K: IntoSql<'a>,
+    L: IntoSql<'a>,
+    M: IntoSql<'a>,
+    N: IntoSql<'a>,
+{
+    fn into_row(self) -> TokenRow<'a> {
+        let mut row = TokenRow::with_capacity(14);
+        row.push(self.0.into_sql());
+        row.push(self.1.into_sql());
+        row.push(self.2.into_sql());
+        row.push(self.3.into_sql());
+        row.push(self.4.into_sql());
+        row.push(self.5.into_sql());
+        row.push(self.6.into_sql());
+        row.push(self.7.into_sql());
+        row.push(self.8.into_sql());
+        row.push(self.9.into_sql());
+        row.push(self.10.into_sql());
+        row.push(self.11.into_sql());
+        row.push(self.12.into_sql());
+        row.push(self.13.into_sql());
+        row
+    }
+}
+
+// Implementation for 15-tuple
+impl<'a, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O> IntoRow<'a>
+    for (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O)
+where
+    A: IntoSql<'a>,
+    B: IntoSql<'a>,
+    C: IntoSql<'a>,
+    D: IntoSql<'a>,
+    E: IntoSql<'a>,
+    F: IntoSql<'a>,
+    G: IntoSql<'a>,
+    H: IntoSql<'a>,
+    I: IntoSql<'a>,
+    J: IntoSql<'a>,
+    K: IntoSql<'a>,
+    L: IntoSql<'a>,
+    M: IntoSql<'a>,
+    N: IntoSql<'a>,
+    O: IntoSql<'a>,
+{
+    fn into_row(self) -> TokenRow<'a> {
+        let mut row = TokenRow::with_capacity(15);
+        row.push(self.0.into_sql());
+        row.push(self.1.into_sql());
+        row.push(self.2.into_sql());
+        row.push(self.3.into_sql());
+        row.push(self.4.into_sql());
+        row.push(self.5.into_sql());
+        row.push(self.6.into_sql());
+        row.push(self.7.into_sql());
+        row.push(self.8.into_sql());
+        row.push(self.9.into_sql());
+        row.push(self.10.into_sql());
+        row.push(self.11.into_sql());
+        row.push(self.12.into_sql());
+        row.push(self.13.into_sql());
+        row.push(self.14.into_sql());
+        row
+    }
+}
