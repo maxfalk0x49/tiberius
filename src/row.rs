@@ -10,12 +10,17 @@ use std::{fmt::Display, sync::Arc};
 pub struct Column {
     pub(crate) name: String,
     pub(crate) column_type: ColumnType,
+    pub(crate) type_info: Option<TypeInfo>,
 }
 
 impl Column {
     /// Construct a new Column.
     pub fn new(name: String, column_type: ColumnType) -> Self {
-        Self { name, column_type }
+        Self {
+            name,
+            column_type,
+            type_info: None,
+        }
     }
 
     /// The name of the column.
@@ -26,6 +31,22 @@ impl Column {
     /// The type of the column.
     pub fn column_type(&self) -> ColumnType {
         self.column_type
+    }
+
+    /// Get the precision for numeric/decimal types
+    pub fn precision(&self) -> Option<u8> {
+        match &self.type_info {
+            Some(TypeInfo::VarLenSizedPrecision { precision, .. }) => Some(*precision),
+            _ => None,
+        }
+    }
+
+    /// Get the scale (decimal places) for numeric/decimal types
+    pub fn scale(&self) -> Option<u8> {
+        match &self.type_info {
+            Some(TypeInfo::VarLenSizedPrecision { scale, .. }) => Some(*scale),
+            _ => None,
+        }
     }
 }
 

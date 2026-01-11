@@ -315,6 +315,7 @@ impl TokenColMetaData<'_> {
         self.columns.iter().map(|x| Column {
             name: x.col_name.to_string(),
             column_type: ColumnType::from(&x.base.ty),
+            type_info: Some(x.base.ty.clone()),
         })
     }
 }
