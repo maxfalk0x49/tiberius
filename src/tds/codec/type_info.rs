@@ -1,7 +1,7 @@
 use asynchronous_codec::BytesMut;
 use bytes::BufMut;
 
-use crate::{tds::Collation, xml::XmlSchema, Error, SqlReadBytes};
+use crate::{Error, SqlReadBytes, tds::Collation, xml::XmlSchema};
 use std::{convert::TryFrom, sync::Arc, usize};
 
 use super::Encode;
@@ -324,7 +324,6 @@ impl TypeInfo {
                     | VarLenType::BigVarChar => {
                         let info = src.read_u32_le().await?;
                         let sort_id = src.read_u8().await?;
-
                         Some(Collation::new(info, sort_id))
                     }
                     _ => None,

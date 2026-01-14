@@ -71,13 +71,14 @@ impl Display for MetaDataColumn<'_> {
                 VarLenType::BigBinary => write!(f, "binary({})", ctx.len())?,
                 VarLenType::BigChar => write!(f, "char({})", ctx.len())?,
                 VarLenType::NVarchar => {
-                    if ctx.len() <= 4000 {
-                        write!(f, "nvarchar({})", ctx.len())?
+                    // NVARCHAR uses 2 bytes per character, max 4000 chars = 8000 bytes
+                    if ctx.len() <= 8000 {
+                        write!(f, "nvarchar({})", ctx.len() / 2)?  // Convert bytes to characters
                     } else {
                         write!(f, "nvarchar(max)")?
                     }
                 }
-                VarLenType::NChar => write!(f, "nchar({})", ctx.len())?,
+                VarLenType::NChar => write!(f, "nchar({})", ctx.len() / 2)?,  // Convert bytes to characters
                 VarLenType::Text => write!(f, "text")?,
                 VarLenType::Image => write!(f, "image")?,
                 VarLenType::NText => write!(f, "ntext")?,
@@ -346,5 +347,91 @@ impl BaseMetaDataColumn {
         };
 
         Ok(BaseMetaDataColumn { flags, ty })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tds::Collation;
+    use crate::VarLenContext;
+
+    #[test]
+    fn nvarchar_display_formats_correctly() {
+        // NVARCHAR uses 2 bytes per character, so len is in bytes
+        // The Display impl should convert bytes to characters
+
+        // NVARCHAR(100) = 200 bytes
+        let col = MetaDataColumn {
+            base: BaseMetaDataColumn {
+                flags: ColumnFlag::Nullable.into(),
+                ty: TypeInfo::VarLenSized(VarLenContext::new(
+                    VarLenType::NVarchar,
+                    200, // 100 chars * 2 bytes
+                    Some(Collation::new(13632521, 0)),
+                )),
+            },
+            col_name: "test_col".into(),
+        };
+        assert_eq!(format!("{}", col), "[test_col] nvarchar(100)");
+
+        // NVARCHAR(2000) = 4000 bytes (boundary case that should work)
+        let col = MetaDataColumn {
+            base: BaseMetaDataColumn {
+                flags: ColumnFlag::Nullable.into(),
+                ty: TypeInfo::VarLenSized(VarLenContext::new(
+                    VarLenType::NVarchar,
+                    4000, // 2000 chars * 2 bytes
+                    Some(Collation::new(13632521, 0)),
+                )),
+            },
+            col_name: "test_col".into(),
+        };
+        assert_eq!(format!("{}", col), "[test_col] nvarchar(2000)");
+
+        // NVARCHAR(4000) = 8000 bytes (max non-MAX nvarchar)
+        let col = MetaDataColumn {
+            base: BaseMetaDataColumn {
+                flags: ColumnFlag::Nullable.into(),
+                ty: TypeInfo::VarLenSized(VarLenContext::new(
+                    VarLenType::NVarchar,
+                    8000, // 4000 chars * 2 bytes
+                    Some(Collation::new(13632521, 0)),
+                )),
+            },
+            col_name: "test_col".into(),
+        };
+        assert_eq!(format!("{}", col), "[test_col] nvarchar(4000)");
+
+        // NVARCHAR(MAX) uses special marker 0xFFFF
+        let col = MetaDataColumn {
+            base: BaseMetaDataColumn {
+                flags: ColumnFlag::Nullable.into(),
+                ty: TypeInfo::VarLenSized(VarLenContext::new(
+                    VarLenType::NVarchar,
+                    0xFFFF, // MAX marker
+                    Some(Collation::new(13632521, 0)),
+                )),
+            },
+            col_name: "test_col".into(),
+        };
+        assert_eq!(format!("{}", col), "[test_col] nvarchar(max)");
+    }
+
+    #[test]
+    fn nchar_display_formats_correctly() {
+        // NCHAR also uses 2 bytes per character
+        let col = MetaDataColumn {
+            base: BaseMetaDataColumn {
+                flags: ColumnFlag::Nullable.into(),
+                ty: TypeInfo::VarLenSized(VarLenContext::new(
+                    VarLenType::NChar,
+                    200, // 100 chars * 2 bytes
+                    Some(Collation::new(13632521, 0)),
+                )),
+            },
+            col_name: "test_col".into(),
+        };
+        assert_eq!(format!("{}", col), "[test_col] nchar(100)");
     }
 }
