@@ -344,22 +344,53 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Client<S> {
             .await?;
 
         // now start bulk upload
-        let columns: Vec<_> = columns
-            .ok_or_else(|| {
-                crate::Error::Protocol("expecting column metadata from query but not found".into())
-            })?
-            .into_iter()
-            .filter(|column| column.base.flags.contains(ColumnFlag::Updateable))
-            .collect();
+        let keep_identity = options.contains(SqlBulkCopyOptions::KeepIdentity);
+        let columns: Vec<_> = if column_names.is_empty() {
+            columns
+                .ok_or_else(|| {
+                    crate::Error::Protocol(
+                        "expecting column metadata from query but not found".into(),
+                    )
+                })?
+                .into_iter()
+                .filter(|column| {
+                    // Include column if it's updateable
+                    column.base.flags.contains(ColumnFlag::Updateable)
+                    // OR if it's an identity column and KeepIdentity is set
+                    || (keep_identity && column.base.flags.contains(ColumnFlag::Identity))
+                })
+                .collect()
+        } else {
+            columns
+                .ok_or_else(|| {
+                    crate::Error::Protocol(
+                        "expecting column metadata from query but not found".into(),
+                    )
+                })?
+                .into_iter()
+                .collect()
+        };
+
+        if columns.is_empty() {
+            return Err(crate::Error::BulkInput(
+                format!("zero columns found for bulkon: {}", table).into(),
+            ));
+        }
 
         self.connection.flush_stream().await?;
         let col_data = columns.iter().map(|c| format!("{}", c)).join(", ");
 
         let mut query = format!("INSERT BULK {} ({})", table, col_data);
-        if !options.is_empty() || !order_hints.is_empty() {
-            query.push_str("WITH (");
-            options.to_bulk_str(&mut query);
-            SortOrder::to_bulk_str(order_hints, &mut query);
+
+        // Build WITH clause content
+        let mut with_clause = String::new();
+        options.to_bulk_str(&mut with_clause);
+        SortOrder::to_bulk_str(order_hints, &mut with_clause);
+
+        // Only add WITH clause if there's actual content
+        if !with_clause.is_empty() {
+            query.push_str(" WITH (");
+            query.push_str(&with_clause);
             query.push_str(")");
         }
 
