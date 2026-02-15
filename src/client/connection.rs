@@ -9,7 +9,7 @@ use crate::{
     tds::{
         codec::{
             self, Encode, LoginMessage, Packet, PacketCodec, PacketHeader, PacketStatus,
-            PreloginMessage, TokenDone,
+            PacketType, PreloginMessage, TokenDone,
         },
         stream::TokenStream,
         Context, HEADER_BYTES,
@@ -57,6 +57,7 @@ where
     flushed: bool,
     context: Context,
     buf: BytesMut,
+    reset_on_next: bool,
 }
 
 impl<S: AsyncRead + AsyncWrite + Unpin + Send> Debug for Connection<S> {
@@ -66,6 +67,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Debug for Connection<S> {
             .field("flushed", &self.flushed)
             .field("context", &self.context)
             .field("buf", &self.buf.as_ref().hex_dump())
+            .field("reset_on_next", &self.reset_on_next)
             .finish()
     }
 }
@@ -86,6 +88,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection<S> {
             context,
             flushed: false,
             buf: BytesMut::new(),
+            reset_on_next: false,
         };
 
         let fed_auth_required = matches!(config.auth, AuthMethod::AADToken(_));
@@ -172,14 +175,33 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection<S> {
         let mut payload = BytesMut::new();
         item.encode(&mut payload)?;
 
+        let mut first = true;
+
         while !payload.is_empty() {
             let writable = cmp::min(payload.len(), packet_size);
             let split_payload = payload.split_to(writable);
 
             if payload.is_empty() {
-                header.set_status(PacketStatus::EndOfMessage);
+                header.set_status(PacketStatus::END_OF_MESSAGE);
             } else {
-                header.set_status(PacketStatus::NormalMessage);
+                header.set_status(PacketStatus::NORMAL_MESSAGE);
+            }
+
+            if first {
+                first = false;
+
+                if self.reset_on_next {
+                    let ty = header.r#type();
+                    if matches!(
+                        ty,
+                        PacketType::SQLBatch
+                            | PacketType::Rpc
+                            | PacketType::TransactionManagerReq
+                    ) {
+                        header.set_reset_connection();
+                        self.reset_on_next = false;
+                    }
+                }
             }
 
             event!(
@@ -467,6 +489,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection<S> {
                 context,
                 flushed: false,
                 buf: BytesMut::new(),
+                reset_on_next: false,
             })
         } else {
             event!(
@@ -491,6 +514,13 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection<S> {
         );
 
         Ok(self)
+    }
+
+    /// Marks this connection so the next eligible request (SQL batch, RPC, or
+    /// transaction manager request) includes the reset-connection flag in the
+    /// TDS packet header.
+    pub(crate) fn set_reset_on_next(&mut self) {
+        self.reset_on_next = true;
     }
 
     pub(crate) async fn close(mut self) -> crate::Result<()> {

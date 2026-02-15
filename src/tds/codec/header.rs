@@ -1,7 +1,6 @@
 use super::{Decode, Encode};
 use crate::Error;
 use bytes::{Buf, BufMut, BytesMut};
-use std::convert::TryFrom;
 
 uint_enum! {
     /// the type of the packet [2.2.3.1.1]#[repr(u32)]
@@ -23,26 +22,29 @@ uint_enum! {
     }
 }
 
-uint_enum! {
-    /// the message state [2.2.3.1.2]
-    #[repr(u8)]
-    pub enum PacketStatus {
-        NormalMessage = 0,
-        EndOfMessage = 1,
-        /// [client to server ONLY] (EndOfMessage also required)
-        IgnoreEvent = 3,
-        /// [client to server ONLY] [>= TDSv7.1]
-        ResetConnection = 0x08,
-        /// [client to server ONLY] [>= TDSv7.3]
-        ResetConnectionSkipTran = 0x10,
-    }
+/// The message state [2.2.3.1.2].
+///
+/// These are bitfield constants — the TDS status byte can combine multiple
+/// flags (e.g. `EndOfMessage | ResetConnection` = `0x09`).
+#[allow(missing_docs)]
+pub struct PacketStatus;
+
+impl PacketStatus {
+    pub const NORMAL_MESSAGE: u8 = 0x00;
+    pub const END_OF_MESSAGE: u8 = 0x01;
+    /// [client to server ONLY] (EndOfMessage also required)
+    pub const IGNORE_EVENT: u8 = 0x03;
+    /// [client to server ONLY] [>= TDSv7.1]
+    pub const RESET_CONNECTION: u8 = 0x08;
+    /// [client to server ONLY] [>= TDSv7.3]
+    pub const RESET_CONNECTION_SKIP_TRAN: u8 = 0x10;
 }
 
 /// packet header consisting of 8 bytes [2.2.3.1]
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct PacketHeader {
     ty: PacketType,
-    status: PacketStatus,
+    status: u8,
     /// [BE] the length of the packet (including the 8 header bytes)
     /// must match the negotiated size sending from client to server [since TDSv7.3] after login
     /// (only if not EndOfMessage)
@@ -60,7 +62,7 @@ impl PacketHeader {
         assert!(length <= u16::max_value() as usize);
         PacketHeader {
             ty: PacketType::TDSv7Login,
-            status: PacketStatus::ResetConnection,
+            status: PacketStatus::NORMAL_MESSAGE,
             length: length as u16,
             spid: 0,
             id,
@@ -71,7 +73,7 @@ impl PacketHeader {
     pub fn rpc(id: u8) -> Self {
         Self {
             ty: PacketType::Rpc,
-            status: PacketStatus::NormalMessage,
+            status: PacketStatus::NORMAL_MESSAGE,
             ..Self::new(0, id)
         }
     }
@@ -79,7 +81,7 @@ impl PacketHeader {
     pub fn pre_login(id: u8) -> Self {
         Self {
             ty: PacketType::PreLogin,
-            status: PacketStatus::EndOfMessage,
+            status: PacketStatus::END_OF_MESSAGE,
             ..Self::new(0, id)
         }
     }
@@ -87,7 +89,7 @@ impl PacketHeader {
     pub fn login(id: u8) -> Self {
         Self {
             ty: PacketType::TDSv7Login,
-            status: PacketStatus::EndOfMessage,
+            status: PacketStatus::END_OF_MESSAGE,
             ..Self::new(0, id)
         }
     }
@@ -95,7 +97,7 @@ impl PacketHeader {
     pub fn batch(id: u8) -> Self {
         Self {
             ty: PacketType::SQLBatch,
-            status: PacketStatus::NormalMessage,
+            status: PacketStatus::NORMAL_MESSAGE,
             ..Self::new(0, id)
         }
     }
@@ -103,12 +105,12 @@ impl PacketHeader {
     pub fn bulk_load(id: u8) -> Self {
         Self {
             ty: PacketType::BulkLoad,
-            status: PacketStatus::NormalMessage,
+            status: PacketStatus::NORMAL_MESSAGE,
             ..Self::new(0, id)
         }
     }
 
-    pub fn set_status(&mut self, status: PacketStatus) {
+    pub fn set_status(&mut self, status: u8) {
         self.status = status;
     }
 
@@ -116,8 +118,16 @@ impl PacketHeader {
         self.ty = ty;
     }
 
-    pub fn status(&self) -> PacketStatus {
+    pub fn status(&self) -> u8 {
         self.status
+    }
+
+    /// Sets the reset-connection flag on this header.
+    ///
+    /// The flag is OR'd into the existing status so it can coexist with
+    /// `EndOfMessage` and other bits.
+    pub fn set_reset_connection(&mut self) {
+        self.status |= PacketStatus::RESET_CONNECTION;
     }
 
     pub fn r#type(&self) -> PacketType {
@@ -135,7 +145,7 @@ where
 {
     fn encode(self, dst: &mut B) -> crate::Result<()> {
         dst.put_u8(self.ty as u8);
-        dst.put_u8(self.status as u8);
+        dst.put_u8(self.status);
         dst.put_u16(self.length);
         dst.put_u16(self.spid);
         dst.put_u8(self.id);
@@ -156,8 +166,7 @@ impl Decode<BytesMut> for PacketHeader {
             Error::Protocol(format!("header: invalid packet type: {}", raw_ty).into())
         })?;
 
-        let status = PacketStatus::try_from(src.get_u8())
-            .map_err(|_| Error::Protocol("header: invalid packet status".into()))?;
+        let status = src.get_u8();
 
         let header = PacketHeader {
             ty,
@@ -169,5 +178,41 @@ impl Decode<BytesMut> for PacketHeader {
         };
 
         Ok(header)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::BytesMut;
+
+    #[test]
+    fn set_reset_connection_ors_flag() {
+        let mut header = PacketHeader::batch(0);
+        assert_eq!(header.status(), PacketStatus::NORMAL_MESSAGE);
+
+        header.set_status(PacketStatus::END_OF_MESSAGE);
+        assert_eq!(header.status(), PacketStatus::END_OF_MESSAGE);
+
+        header.set_reset_connection();
+        assert_eq!(
+            header.status(),
+            PacketStatus::END_OF_MESSAGE | PacketStatus::RESET_CONNECTION
+        );
+        assert_eq!(header.status(), 0x09);
+    }
+
+    #[test]
+    fn encode_round_trips_with_reset_flag() {
+        let mut header = PacketHeader::rpc(42);
+        header.set_status(PacketStatus::END_OF_MESSAGE);
+        header.set_reset_connection();
+
+        let mut buf = BytesMut::new();
+        header.encode(&mut buf).unwrap();
+
+        assert_eq!(buf[0], PacketType::Rpc as u8);
+        assert_eq!(buf[1], 0x09); // END_OF_MESSAGE | RESET_CONNECTION
+        assert_eq!(buf[6], 42); // packet id
     }
 }

@@ -77,7 +77,7 @@ where
         self.write_packets().await?;
 
         let mut header = PacketHeader::bulk_load(self.packet_id);
-        header.set_status(PacketStatus::EndOfMessage);
+        header.set_status(PacketStatus::END_OF_MESSAGE);
 
         let data = self.buf.split();
 

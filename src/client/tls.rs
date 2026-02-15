@@ -239,7 +239,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> AsyncWrite for TlsPreloginWrapper
                 let mut header = PacketHeader::new(inner.wr_buf.len(), 0);
 
                 header.set_type(PacketType::PreLogin);
-                header.set_status(PacketStatus::EndOfMessage);
+                header.set_status(PacketStatus::END_OF_MESSAGE);
 
                 header
                     .encode(&mut &mut inner.wr_buf[0..HEADER_BYTES])

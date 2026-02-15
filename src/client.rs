@@ -405,6 +405,19 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Client<S> {
         BulkLoadRequest::new(&mut self.connection, columns)
     }
 
+    /// Marks the connection for reset on the next request.
+    ///
+    /// The server executes the equivalent of `sp_reset_connection` before
+    /// processing the next SQL batch or RPC call, clearing temp tables,
+    /// session settings, locks, and aborting uncommitted transactions.
+    ///
+    /// Intended for connection pool implementations that need to return a
+    /// connection to a clean state without the overhead of disconnecting
+    /// and reconnecting.
+    pub fn reset_connection(&mut self) {
+        self.connection.set_reset_on_next();
+    }
+
     /// Closes this database connection explicitly.
     pub async fn close(self) -> crate::Result<()> {
         self.connection.close().await
