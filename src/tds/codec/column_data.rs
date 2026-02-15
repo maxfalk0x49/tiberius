@@ -316,18 +316,18 @@ impl<'a> Encode<BytesMutWithTypeInfo<'a>> for ColumnData<'a> {
                         ));
                     }
 
-                    if bytes.len() > vlc.len() {
-                        return Err(crate::Error::BulkInput(
-                            format!(
-                                "Encoded string length {} exceed column limit {}",
-                                bytes.len(),
-                                vlc.len()
-                            )
-                            .into(),
-                        ));
-                    }
-
                     if vlc.len() < 0xffff {
+                        if bytes.len() > vlc.len() {
+                            return Err(crate::Error::BulkInput(
+                                format!(
+                                    "Encoded string length {} exceed column limit {}",
+                                    bytes.len(),
+                                    vlc.len()
+                                )
+                                .into(),
+                            ));
+                        }
+
                         dst.put_u16_le(bytes.len() as u16);
                         dst.extend_from_slice(bytes.as_slice());
                     } else {
@@ -398,17 +398,6 @@ impl<'a> Encode<BytesMutWithTypeInfo<'a>> for ColumnData<'a> {
                         }
 
                         let length = dst.len() - len_pos - 4;
-
-                        if length > vlc.len() {
-                            return Err(crate::Error::BulkInput(
-                                format!(
-                                    "Encoded string length {} exceed column limit {}",
-                                    length,
-                                    vlc.len()
-                                )
-                                .into(),
-                            ));
-                        }
 
                         if length > 0 {
                             // no next blob
@@ -1412,6 +1401,182 @@ mod tests {
             } else {
                 panic!("Expected: Error::BulkInput, got: {:?}", err);
             }
+        }
+    }
+
+    // --- ZOMBIES tests for NVARCHAR(MAX) and VARCHAR(MAX) ---
+
+    fn nvarchar_max_ti() -> TypeInfo {
+        TypeInfo::VarLenSized(VarLenContext::new(
+            VarLenType::NVarchar,
+            0xffff,
+            Some(Collation::new(13632521, 52)),
+        ))
+    }
+
+    fn varchar_max_ti() -> TypeInfo {
+        TypeInfo::VarLenSized(VarLenContext::new(
+            VarLenType::BigVarChar,
+            0xffff,
+            Some(Collation::new(13632521, 52)),
+        ))
+    }
+
+    fn nvarchar_limited_ti(len: usize) -> TypeInfo {
+        TypeInfo::VarLenSized(VarLenContext::new(
+            VarLenType::NVarchar,
+            len,
+            Some(Collation::new(13632521, 52)),
+        ))
+    }
+
+    fn varchar_limited_ti(len: usize) -> TypeInfo {
+        TypeInfo::VarLenSized(VarLenContext::new(
+            VarLenType::BigVarChar,
+            len,
+            Some(Collation::new(13632521, 52)),
+        ))
+    }
+
+    // Zero
+
+    #[tokio::test]
+    async fn nvarchar_max_empty_string() {
+        test_round_trip(nvarchar_max_ti(), ColumnData::String(Some("".into()))).await;
+    }
+
+    #[tokio::test]
+    async fn nvarchar_max_null() {
+        test_round_trip(nvarchar_max_ti(), ColumnData::String(None)).await;
+    }
+
+    #[tokio::test]
+    async fn varchar_max_empty_string() {
+        test_round_trip(varchar_max_ti(), ColumnData::String(Some("".into()))).await;
+    }
+
+    #[tokio::test]
+    async fn varchar_max_null() {
+        test_round_trip(varchar_max_ti(), ColumnData::String(None)).await;
+    }
+
+    // One
+
+    #[tokio::test]
+    async fn nvarchar_max_single_char() {
+        test_round_trip(nvarchar_max_ti(), ColumnData::String(Some("a".into()))).await;
+    }
+
+    #[tokio::test]
+    async fn varchar_max_single_char() {
+        test_round_trip(varchar_max_ti(), ColumnData::String(Some("a".into()))).await;
+    }
+
+    // Many / Simple
+
+    #[tokio::test]
+    async fn nvarchar_max_medium_string() {
+        let s: String = "x".repeat(1000);
+        test_round_trip(nvarchar_max_ti(), ColumnData::String(Some(s.into()))).await;
+    }
+
+    #[tokio::test]
+    async fn varchar_max_medium_string() {
+        let s: String = "x".repeat(1000);
+        test_round_trip(varchar_max_ti(), ColumnData::String(Some(s.into()))).await;
+    }
+
+    // Boundary
+
+    #[tokio::test]
+    async fn nvarchar_max_at_u16_boundary() {
+        // 32767 ASCII chars * 2 bytes UTF-16 = 65534 bytes (just under 0xFFFF)
+        let s: String = "a".repeat(32767);
+        test_round_trip(nvarchar_max_ti(), ColumnData::String(Some(s.into()))).await;
+    }
+
+    #[tokio::test]
+    async fn nvarchar_max_over_u16_boundary() {
+        // 33000 ASCII chars * 2 bytes UTF-16 = 66000 bytes (exceeds 0xFFFF — bug trigger)
+        let s: String = "a".repeat(33000);
+        test_round_trip(nvarchar_max_ti(), ColumnData::String(Some(s.into()))).await;
+    }
+
+    #[tokio::test]
+    async fn varchar_max_at_u16_boundary() {
+        // 65534 ASCII bytes — just under 0xFFFF
+        let s: String = "a".repeat(65534);
+        test_round_trip(varchar_max_ti(), ColumnData::String(Some(s.into()))).await;
+    }
+
+    #[tokio::test]
+    async fn varchar_max_over_u16_boundary() {
+        // 66000 bytes — exceeds 0xFFFF (bug trigger)
+        let s: String = "a".repeat(66000);
+        test_round_trip(varchar_max_ti(), ColumnData::String(Some(s.into()))).await;
+    }
+
+    #[tokio::test]
+    async fn nvarchar_max_large_string() {
+        let s: String = "a".repeat(100_000);
+        test_round_trip(nvarchar_max_ti(), ColumnData::String(Some(s.into()))).await;
+    }
+
+    #[tokio::test]
+    async fn varchar_max_large_string() {
+        let s: String = "a".repeat(100_000);
+        test_round_trip(varchar_max_ti(), ColumnData::String(Some(s.into()))).await;
+    }
+
+    // Interface — Unicode handling
+
+    #[tokio::test]
+    async fn nvarchar_max_unicode() {
+        let s = "Hello \u{4e16}\u{754c} \u{1f600}"; // "Hello 世界 😀"
+        test_round_trip(nvarchar_max_ti(), ColumnData::String(Some(s.into()))).await;
+    }
+
+    #[tokio::test]
+    async fn nvarchar_max_surrogate_pairs() {
+        // Characters outside BMP that require surrogate pairs in UTF-16
+        let s = "\u{1f4a9}\u{1f680}\u{1d11e}"; // 💩🚀𝄞
+        test_round_trip(nvarchar_max_ti(), ColumnData::String(Some(s.into()))).await;
+    }
+
+    // Exceptions — limited types should still reject oversized data
+
+    #[tokio::test]
+    async fn varchar_limited_exceeds_limit() {
+        let ti = varchar_limited_ti(10);
+        let s: String = "a".repeat(20);
+        let mut buf = BytesMut::new();
+        let mut buf_ti = BytesMutWithTypeInfo::new(&mut buf).with_type_info(&ti);
+
+        let err = ColumnData::String(Some(s.into()))
+            .encode(&mut buf_ti)
+            .expect_err("encode should fail for oversized string");
+
+        if let Error::BulkInput(_) = err {
+        } else {
+            panic!("Expected: Error::BulkInput, got: {:?}", err);
+        }
+    }
+
+    #[tokio::test]
+    async fn nvarchar_limited_exceeds_limit() {
+        // NVarchar with len=200 bytes; 200 ASCII chars = 400 bytes UTF-16, exceeds 200
+        let ti = nvarchar_limited_ti(200);
+        let s: String = "a".repeat(200);
+        let mut buf = BytesMut::new();
+        let mut buf_ti = BytesMutWithTypeInfo::new(&mut buf).with_type_info(&ti);
+
+        let err = ColumnData::String(Some(s.into()))
+            .encode(&mut buf_ti)
+            .expect_err("encode should fail for oversized string");
+
+        if let Error::BulkInput(_) = err {
+        } else {
+            panic!("Expected: Error::BulkInput, got: {:?}", err);
         }
     }
 }
