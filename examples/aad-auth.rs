@@ -8,9 +8,10 @@
 //!   - CLIENT_SECRET: service principal secret;
 //!   - TENANT_ID: tenant id of service principal and sql instance;
 //!   - SERVER: SQL server URI
-use azure_identity::client_credentials_flow;
+use azure_core::credentials::TokenCredential;
+use azure_identity::ClientSecretCredential;
 use oauth2::{ClientId, ClientSecret};
-use std::{env, sync::Arc};
+use std::env;
 use tiberius::{AuthMethod, Client, Config, Query};
 use tokio::net::TcpStream;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
@@ -25,23 +26,21 @@ async fn main() -> anyhow::Result<()> {
     );
     let tenant_id = env::var("TENANT_ID").expect("Missing TENANT_ID environment variable.");
 
-    let client = Arc::new(reqwest::Client::new());
     // This will give you the final token to use in authorization.
-    let token = client_credentials_flow::perform(
-        client,
-        &client_id,
-        &client_secret,
-        &["https://management.azure.com/"],
+    let cred = ClientSecretCredential::new(
         &tenant_id,
-    )
-    .await?;
+        client_id.as_str().to_string(),
+        client_secret.secret().to_string().into(),
+        None,
+    )?;
+    let token = cred.get_token(&["https://management.azure.com/"], None).await?;
 
     let mut config = Config::new();
     let server = env::var("SERVER").expect("Missing SERVER environment variable.");
     config.host(server);
     config.port(1433);
     config.authentication(AuthMethod::AADToken(
-        token.access_token().secret().to_string(),
+        token.token.secret().to_string(),
     ));
     config.trust_cert();
 
