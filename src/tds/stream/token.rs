@@ -1,18 +1,18 @@
 use crate::tds::codec::TokenSspi;
 use crate::{
+    Error, SqlReadBytes, TokenType,
     client::Connection,
     tds::codec::{
         TokenColMetaData, TokenDone, TokenEnvChange, TokenError, TokenFeatureExtAck, TokenInfo,
         TokenLoginAck, TokenOrder, TokenReturnValue, TokenRow,
     },
-    Error, SqlReadBytes, TokenType,
 };
 use futures_util::{
     io::{AsyncRead, AsyncWrite},
     stream::{BoxStream, TryStreamExt},
 };
 use std::{convert::TryFrom, sync::Arc};
-use tracing::{event, Level};
+use tracing::{Level, event};
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -184,7 +184,7 @@ where
             _ => (),
         }
 
-        event!(Level::INFO, "{}", change);
+        event!(Level::DEBUG, "{}", change);
 
         Ok(ReceivedToken::EnvChange(change))
     }
