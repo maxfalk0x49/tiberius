@@ -1,5 +1,8 @@
 extern crate proc_macro;
 use darling::FromMeta;
+use syn::parse_macro_input;
+use syn::punctuated::Punctuated;
+use syn::Token;
 
 #[derive(Debug, FromMeta)]
 struct MacroArgs {
@@ -12,16 +15,17 @@ pub fn test_on_runtimes(
     args: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let attr_args = syn::parse_macro_input!(args as syn::AttributeArgs);
+    let attr_args = parse_macro_input!(args with Punctuated::<darling::ast::NestedMeta, Token![,]>::parse_terminated);
+    let attr_args_vec: Vec<darling::ast::NestedMeta> = attr_args.into_iter().collect();
 
-    let args = match MacroArgs::from_list(&attr_args) {
+    let args = match MacroArgs::from_list(&attr_args_vec) {
         Ok(v) => v,
         Err(e) => {
             return proc_macro::TokenStream::from(e.write_errors());
         }
     };
 
-    let func = syn::parse_macro_input!(input as syn::ItemFn);
+    let func = parse_macro_input!(input as syn::ItemFn);
 
     let conn_str_ident_str = args.connection_string.unwrap_or_else(|| "CONN_STR".into());
 
