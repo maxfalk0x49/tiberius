@@ -125,11 +125,14 @@ optional = true
 [dependencies.tokio-rustls]
 version = "0.26"
 optional = true
+default-features = false
+features = ["logging", "tls12", "ring"]
 
 [dependencies.rustls]
 version = "0.23"
 optional = true
-features = ["ring"]
+default-features = false
+features = ["logging", "std", "tls12", "ring"]
 
 [dependencies.rustls-pki-types]
 version = "1"
