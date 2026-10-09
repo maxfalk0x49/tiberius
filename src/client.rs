@@ -19,7 +19,7 @@ use crate::{
     BulkLoadRequest, ColumnFlag, SqlReadBytes, ToSql,
     result::ExecuteResult,
     tds::{
-        codec::{self, IteratorJoin},
+        codec::{self, IteratorJoin, MetaDataColumn},
         stream::{QueryStream, TokenStream},
     },
 };
@@ -308,6 +308,10 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Client<S> {
 
     /// Execute a `BULK INSERT` statement with options, giving more controll over how the bulk
     /// insert should happen
+    ///
+    /// Each call first asks the server for the column metadata (`SELECT TOP 0`). To insert
+    /// into the same table many times, fetch it once with
+    /// [`Client::bulk_insert_metadata`] and use [`Client::bulk_insert_with_metadata`].
     pub async fn bulk_insert_with_options<'a>(
         &'a mut self,
         table: &'a str,
@@ -315,7 +319,29 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Client<S> {
         options: SqlBulkCopyOptions,
         order_hints: &'a [ColumOrderHint<'a>],
     ) -> crate::Result<BulkLoadRequest<'a, S>> {
-        // Start the bulk request
+        let metadata = self
+            .bulk_insert_metadata(table, column_names, &options)
+            .await?;
+        self.start_bulk_insert(table, metadata.columns, options, order_hints)
+            .await
+    }
+
+    /// Fetches the column metadata a bulk insert into `table` needs, for reuse.
+    ///
+    /// `column_names` and the `KeepIdentity` flag of `options` pick the columns exactly as
+    /// in [`Client::bulk_insert_with_options`]; pass the same `options` when using the
+    /// result. The metadata stays valid while the table's schema does not change, and may
+    /// be shared between connections to the same database.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the query fails, or if the table has no columns to insert into.
+    pub async fn bulk_insert_metadata(
+        &mut self,
+        table: &str,
+        column_names: &[&str],
+        options: &SqlBulkCopyOptions,
+    ) -> crate::Result<BulkLoadMetadata> {
         self.connection.flush_stream().await?;
 
         // retrieve column metadata from server
@@ -341,35 +367,26 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Client<S> {
 
                 Ok(columns)
             })
-            .await?;
+            .await?
+            .ok_or_else(|| {
+                crate::Error::Protocol("expecting column metadata from query but not found".into())
+            })?;
 
-        // now start bulk upload
         let keep_identity = options.contains(SqlBulkCopyOptions::KeepIdentity);
-        let columns: Vec<_> = if column_names.is_empty() {
-            columns
-                .ok_or_else(|| {
-                    crate::Error::Protocol(
-                        "expecting column metadata from query but not found".into(),
-                    )
-                })?
-                .into_iter()
-                .filter(|column| {
+        let columns: Vec<MetaDataColumn<'static>> = columns
+            .into_iter()
+            .filter(|column| {
+                !column_names.is_empty()
                     // Include column if it's updateable
-                    column.base.flags.contains(ColumnFlag::Updateable)
+                    || column.base.flags.contains(ColumnFlag::Updateable)
                     // OR if it's an identity column and KeepIdentity is set
                     || (keep_identity && column.base.flags.contains(ColumnFlag::Identity))
-                })
-                .collect()
-        } else {
-            columns
-                .ok_or_else(|| {
-                    crate::Error::Protocol(
-                        "expecting column metadata from query but not found".into(),
-                    )
-                })?
-                .into_iter()
-                .collect()
-        };
+            })
+            .map(|column| MetaDataColumn {
+                base: column.base,
+                col_name: Cow::Owned(column.col_name.into_owned()),
+            })
+            .collect();
 
         if columns.is_empty() {
             return Err(crate::Error::BulkInput(
@@ -377,6 +394,32 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Client<S> {
             ));
         }
 
+        Ok(BulkLoadMetadata { columns })
+    }
+
+    /// Execute a `BULK INSERT` statement using metadata from [`Client::bulk_insert_metadata`].
+    ///
+    /// Same as [`Client::bulk_insert_with_options`] without the metadata round trip, which
+    /// needs a schema stability lock on the table and so can wait behind other sessions.
+    pub async fn bulk_insert_with_metadata<'a>(
+        &'a mut self,
+        table: &'a str,
+        metadata: &BulkLoadMetadata,
+        options: SqlBulkCopyOptions,
+        order_hints: &'a [ColumOrderHint<'a>],
+    ) -> crate::Result<BulkLoadRequest<'a, S>> {
+        self.connection.flush_stream().await?;
+        self.start_bulk_insert(table, metadata.columns.clone(), options, order_hints)
+            .await
+    }
+
+    async fn start_bulk_insert<'a>(
+        &'a mut self,
+        table: &'a str,
+        columns: Vec<MetaDataColumn<'a>>,
+        options: SqlBulkCopyOptions,
+        order_hints: &'a [ColumOrderHint<'a>],
+    ) -> crate::Result<BulkLoadRequest<'a, S>> {
         self.connection.flush_stream().await?;
         let col_data = columns.iter().map(|c| format!("{}", c)).join(", ");
 
@@ -477,5 +520,36 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Client<S> {
         self.connection.send(PacketHeader::rpc(id), req).await?;
 
         Ok(())
+    }
+}
+
+/// Column metadata for bulk inserts into one table; see [`Client::bulk_insert_metadata`].
+///
+/// Cheap to clone and safe to share between threads and connections.
+#[derive(Debug, Clone)]
+pub struct BulkLoadMetadata {
+    columns: Vec<MetaDataColumn<'static>>,
+}
+
+impl BulkLoadMetadata {
+    /// Number of columns the bulk insert writes.
+    pub fn len(&self) -> usize {
+        self.columns.len()
+    }
+
+    /// Whether there are no columns (never true for metadata from the server).
+    pub fn is_empty(&self) -> bool {
+        self.columns.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod bulk_load_metadata_tests {
+    use super::BulkLoadMetadata;
+
+    #[test]
+    fn metadata_is_send_sync_and_clone() {
+        fn assert_traits<T: Send + Sync + Clone + 'static>() {}
+        assert_traits::<BulkLoadMetadata>();
     }
 }
